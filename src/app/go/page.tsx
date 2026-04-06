@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 
 function LocationContent() {
@@ -9,35 +9,29 @@ function LocationContent() {
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
   const title = searchParams.get('title') || 'Shared Location';
-  const [redirected, setRedirected] = useState(false);
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
-    if (!lat || !lng) return;
+    if (!lat || !lng || redirectedRef.current) return;
 
-    // Auto-redirect on mobile
+    // Auto-redirect ONLY on Android (has native app chooser)
     const userAgent = navigator.userAgent;
-    const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
     const isAndroid = /Android/i.test(userAgent);
-    const isMobile = isIOS || isAndroid;
     
-    if (isMobile && !redirected) {
-      setRedirected(true);
+    if (isAndroid) {
+      redirectedRef.current = true;
       
-      if (isIOS) {
-        // iOS: Use Apple Maps URL (triggers app chooser with Google Maps, Waze, etc.)
-        window.location.href = `https://maps.apple.com/?q=${encodeURIComponent(title)}&ll=${lat},${lng}`;
-      } else if (isAndroid) {
-        // Android: Use geo: URI (native app chooser)
-        const geoUri = `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(title)})`;
-        window.location.href = geoUri;
-        
-        // Fallback to Google Maps if geo: doesn't work
-        setTimeout(() => {
-          window.location.href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-        }, 1500);
-      }
+      // Android: Use geo: URI (native app chooser)
+      const geoUri = `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(title)})`;
+      window.location.href = geoUri;
+      
+      // Fallback to Google Maps if geo: doesn't work
+      setTimeout(() => {
+        window.location.href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+      }, 1500);
     }
-  }, [lat, lng, title, redirected]);
+    // iOS users will see the manual app selection buttons (no auto-redirect)
+  }, [lat, lng, title]);
 
   if (!lat || !lng) {
     return (
@@ -68,9 +62,45 @@ function LocationContent() {
     );
   }
 
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  const appleMapsUrl = `https://maps.apple.com/?q=${lat},${lng}`;
-  const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+  // Use app-specific deep links for iOS, with web fallback
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+  
+  // Navigation Apps
+  const googleMapsUrl = isIOS
+    ? `comgooglemaps://?q=${lat},${lng}&center=${lat},${lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  
+  const appleMapsUrl = isIOS
+    ? `maps://?q=${encodeURIComponent(title)}&ll=${lat},${lng}`
+    : `https://maps.apple.com/?q=${lat},${lng}`;
+  
+  const wazeUrl = isIOS
+    ? `waze://?ll=${lat},${lng}&navigate=yes`
+    : `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+  
+  // Ride-hailing Apps
+  const uberUrl = isIOS
+    ? `uber://?action=setPickup&pickup=my_location&dropoff[latitude]=${lat}&dropoff[longitude]=${lng}&dropoff[nickname]=${encodeURIComponent(title)}`
+    : `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${lat}&dropoff[longitude]=${lng}`;
+  
+  const olaUrl = isIOS
+    ? `olacabs://app/launch?lat=${lat}&lng=${lng}`
+    : `https://book.olacabs.com/?drop_lat=${lat}&drop_lng=${lng}`;
+  
+  const rapidoUrl = isIOS
+    ? `rapido://destination?lat=${lat}&lng=${lng}`
+    : `https://rapido.bike/ride?drop_lat=${lat}&drop_lng=${lng}`;
+  
+  // Logistics App
+  const porterUrl = isIOS
+    ? `porter://drop?lat=${lat}&lng=${lng}`
+    : `https://porter.in/book?drop_lat=${lat}&drop_lng=${lng}`;
+  
+  // Food Delivery App
+  const zomatoUrl = isIOS
+    ? `zomato://restaurant?lat=${lat}&lng=${lng}`
+    : `https://www.zomato.com/`;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
@@ -145,18 +175,103 @@ function LocationContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </a>
+
+            <a
+              href={uberUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full px-6 py-4 bg-black dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 rounded-lg transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-black text-xl">
+                  🚕
+                </div>
+                <span className="font-semibold text-white">Uber</span>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+
+            <a
+              href={olaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full px-6 py-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white text-xl">
+                  🚖
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-white">Ola</span>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+
+            <a
+              href={rapidoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full px-6 py-4 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-lg transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center text-white text-xl">
+                  🏍️
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-white">Rapido</span>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+
+            <a
+              href={porterUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full px-6 py-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white text-xl">
+                  📦
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-white">Porter</span>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+
+            <a
+              href={zomatoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between w-full px-6 py-4 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white text-xl">
+                  🍽️
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-white">Zomato</span>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
           </div>
         </div>
 
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-6">
-          <h3 className="text-sm font-semibold text-yellow-900 dark:text-yellow-300 mb-2 flex items-center gap-2">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-6">
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            On Mobile?
+            How It Works
           </h3>
-          <p className="text-sm text-yellow-800 dark:text-yellow-300">
-            If you're on a mobile device and the app chooser didn't appear automatically, tap one of the options above.
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            {'On Android, the app chooser appears automatically. On iOS, tap your preferred app above. Choose from navigation (Maps, Waze), ride-hailing (Uber, Ola, Rapido), logistics (Porter), or food delivery (Zomato).'}
           </p>
         </div>
       </div>
