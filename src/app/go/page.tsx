@@ -15,19 +15,27 @@ function LocationContent() {
     if (!lat || !lng) return;
 
     // Auto-redirect on mobile
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+    const isAndroid = /Android/i.test(userAgent);
+    const isMobile = isIOS || isAndroid;
     
     if (isMobile && !redirected) {
       setRedirected(true);
       
-      // Redirect to geo: URI which triggers the OS app chooser
-      const geoUri = `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(title)})`;
-      window.location.href = geoUri;
-
-      // Fallback to Google Maps after 1 second if geo: doesn't work
-      setTimeout(() => {
-        window.location.href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-      }, 1000);
+      if (isIOS) {
+        // iOS: Use Apple Maps URL (triggers app chooser with Google Maps, Waze, etc.)
+        window.location.href = `https://maps.apple.com/?q=${encodeURIComponent(title)}&ll=${lat},${lng}`;
+      } else if (isAndroid) {
+        // Android: Use geo: URI (native app chooser)
+        const geoUri = `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(title)})`;
+        window.location.href = geoUri;
+        
+        // Fallback to Google Maps if geo: doesn't work
+        setTimeout(() => {
+          window.location.href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        }, 1500);
+      }
     }
   }, [lat, lng, title, redirected]);
 
