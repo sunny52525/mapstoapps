@@ -1,5 +1,61 @@
 import { NextResponse } from 'next/server';
 
+async function reverseGeocode(lat: string, lng: string): Promise<string> {
+  try {
+    // Use Nominatim reverse geocoding (free, no API key needed)
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`,
+      {
+        headers: {
+          'User-Agent': 'MapsToAny-App/1.0',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Nominatim API error:', response.statusText);
+      return 'Location';
+    }
+
+    const data = await response.json();
+    
+    // Build a human-readable location name from the address components
+    const address = data.address || {};
+    const parts = [];
+
+    // Prioritize more specific to less specific
+    if (address.amenity) parts.push(address.amenity);
+    if (address.shop) parts.push(address.shop);
+    if (address.tourism) parts.push(address.tourism);
+    if (address.building) parts.push(address.building);
+    if (address.house_number && address.road) {
+      parts.push(`${address.house_number} ${address.road}`);
+    } else if (address.road) {
+      parts.push(address.road);
+    }
+    
+    // Add neighborhood/suburb if we don't have specific place yet
+    if (parts.length === 0) {
+      if (address.neighbourhood) parts.push(address.neighbourhood);
+      if (address.suburb) parts.push(address.suburb);
+    }
+    
+    // Always add city and country
+    if (address.city) parts.push(address.city);
+    if (address.town) parts.push(address.town);
+    if (address.village) parts.push(address.village);
+    if (address.state) parts.push(address.state);
+    if (address.country) parts.push(address.country);
+
+    // Return the formatted location name (limit to first 4 most relevant parts)
+    const locationName = parts.slice(0, 4).join(', ');
+    return locationName || data.display_name || 'Location';
+  } catch (error) {
+    console.error('Reverse geocoding error:', error);
+    return 'Location';
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { url } = await req.json();
@@ -30,9 +86,9 @@ export async function POST(req: Request) {
 
     let lat = null;
     let lng = null;
-    let title = 'Shared Location';
+    let title = '';
 
-    // Extract title from OG tags
+    // Extract title from OG tags as fallback
     const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i) || 
                        html.match(/<title>([^<]+)<\/title>/i);
     if (titleMatch && titleMatch[1]) {
@@ -48,9 +104,10 @@ export async function POST(req: Request) {
       lng = atMatch[2];
     }
 
-    // Attempt 2: Look for coordinates in URL path like /maps/place/name/37.7749,-122.4194
+    // Attempt 2: Look for coordinates in URL path like /maps/place/name/37.7749,-122.4194 or /maps/search/28.437462,+77.141844
     if (!lat || !lng) {
-      const pathCoords = finalUrl.match(/\/(-?\d+\.?\d*),(-?\d+\.?\d*)(?:\/|$|\?)/);
+      // Updated regex to handle optional + sign and spaces that may appear in URLs
+      const pathCoords = finalUrl.match(/\/(-?\d+\.?\d*),\s*[+\s]*(-?\d+\.?\d*)(?:\/|$|\?|&)/);
       if (pathCoords) {
         lat = pathCoords[1];
         lng = pathCoords[2];
@@ -126,6 +183,17 @@ export async function POST(req: Request) {
 
     if (!lat || !lng) {
       return NextResponse.json({ error: 'Could not extract coordinates', finalUrl, title }, { status: 400 });
+    }
+
+    // Always use reverse geocoding to get the actual location name
+    // Only fall back to Google Maps metadata title if reverse geocoding fails
+    const geocodedTitle = await reverseGeocode(lat, lng);
+    
+    // Use geocoded title if it's meaningful, otherwise fall back to Google Maps title
+    if (geocodedTitle && geocodedTitle !== 'Location') {
+      title = geocodedTitle;
+    } else if (!title || title === 'Google Maps') {
+      title = 'Shared Location';
     }
 
     return NextResponse.json({
