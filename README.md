@@ -1,6 +1,6 @@
 
 # 📍 Maps to Any
-
+# Vibecoded
 **Share locations that open in Uber, Waze, Apple Maps, Rapido, Zomato - whatever app your friends prefer!**
 
 🔗 **Live App**: [mapstoapps.vercel.app](https://mapstoapps.vercel.app)
