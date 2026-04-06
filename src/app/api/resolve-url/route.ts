@@ -116,21 +116,29 @@ export async function POST(req: Request) {
 
     // Attempt 3: Parse from og:image meta tag
     if (!lat || !lng) {
-      const imageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
+      // Match og:image meta tag with flexible attribute order
+      const imageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                         html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+      
       if (imageMatch && imageMatch[1]) {
         // Decode the URL first
         const decodedImage = decodeURIComponent(imageMatch[1]);
         
-        // Find center=37.7749,122.4194 or center=37.7749%2C-122.4194
-        const centerMatch = decodedImage.match(/center=(-?\d+\.?\d*),(-?\d+\.?\d*)/) ||
-                            imageMatch[1].match(/center=(-?\d+\.?\d+)%2C(-?\d+\.?\d+)/);
+        // Try both decoded and encoded versions
+        // Pattern 1: After decoding, matches center=28.4196864,77.1129344
+        const decodedCenterMatch = decodedImage.match(/center=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+        // Pattern 2: Before decoding, matches center=28.4196864%2C77.1129344
+        const encodedCenterMatch = imageMatch[1].match(/center=(-?\d+\.?\d*)%2C(-?\d+\.?\d*)/);
+        
+        const centerMatch = decodedCenterMatch || encodedCenterMatch;
+        
         if (centerMatch) {
           lat = centerMatch[1];
           lng = centerMatch[2];
         } else {
           // Also try markers parameter in staticmap url
           const markerMatch = decodedImage.match(/markers=.*?(-?\d+\.?\d*),(-?\d+\.?\d*)/) ||
-                              imageMatch[1].match(/markers=([^%&]+)%7C(-?\d+\.?\d+)%2C(-?\d+\.?\d+)/);
+                              imageMatch[1].match(/markers=([^%&]+)%7C(-?\d+\.?\d*)%2C(-?\d+\.?\d*)/);
           if (markerMatch && markerMatch.length >= 3) {
             lat = markerMatch[markerMatch.length - 2];
             lng = markerMatch[markerMatch.length - 1];
@@ -147,7 +155,10 @@ export async function POST(req: Request) {
         // Validate these look like valid coordinates (lat: -90 to 90, lng: -180 to 180)
         const testLat = parseFloat(coordPattern[1]);
         const testLng = parseFloat(coordPattern[2]);
-        if (testLat >= -90 && testLat <= 90 && testLng >= -180 && testLng <= 180) {
+        // Additional check: reject obviously invalid coordinates like [1, 2]
+        // Real coordinates should have at least 2 decimal places for precision
+        const hasDecimal = coordPattern[1].includes('.') || coordPattern[2].includes('.');
+        if (testLat >= -90 && testLat <= 90 && testLng >= -180 && testLng <= 180 && hasDecimal) {
           lat = coordPattern[1];
           lng = coordPattern[2];
         }
