@@ -8,6 +8,10 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showManual, setShowManual] = useState(false);
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
+  const [title, setTitle] = useState('');
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +44,34 @@ export default function Home() {
     }
   };
 
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    // Validate coordinates
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      setError('Please enter valid numbers for latitude and longitude');
+      return;
+    }
+    
+    if (latNum < -90 || latNum > 90) {
+      setError('Latitude must be between -90 and 90');
+      return;
+    }
+    
+    if (lngNum < -180 || lngNum > 180) {
+      setError('Longitude must be between -180 and 180');
+      return;
+    }
+    
+    // Create shareable URL directly with coordinates
+    const shareableUrl = `${window.location.origin}/go?lat=${lat}&lng=${lng}&title=${encodeURIComponent(title || 'Manual Location')}`;
+    router.push(`/success?url=${encodeURIComponent(shareableUrl)}&title=${encodeURIComponent(title || 'Manual Location')}`);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
       <main className="w-full max-w-2xl">
@@ -56,37 +88,125 @@ export default function Home() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 mb-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Google Maps URL
-              </label>
-              <input
-                type="text"
-                id="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://maps.google.com/..."
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
-                required
-                disabled={loading}
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-                {error}
+          {!showManual ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Google Maps URL
+                </label>
+                <input
+                  type="text"
+                  id="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://maps.google.com/..."
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
+                  required
+                  disabled={loading}
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading || !url}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Generating Link...' : 'Generate Shareable Link'}
-            </button>
-          </form>
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !url}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Generating Link...' : 'Generate Shareable Link'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowManual(true)}
+                className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-all text-sm"
+              >
+                Or enter coordinates manually
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleManualSubmit} className="space-y-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Enter coordinates manually as a fallback
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="lat" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Latitude
+                  </label>
+                  <input
+                    type="text"
+                    id="lat"
+                    value={lat}
+                    onChange={(e) => setLat(e.target.value)}
+                    placeholder="28.4196864"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="lng" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Longitude
+                  </label>
+                  <input
+                    type="text"
+                    id="lng"
+                    value={lng}
+                    onChange={(e) => setLng(e.target.value)}
+                    placeholder="77.1129344"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Location Name (optional)
+                </label>
+                <input
+                  type="text"
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="My Location"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManual(false);
+                    setError('');
+                  }}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-lg transition-all"
+                >
+                  Back to URL
+                </button>
+                <button
+                  type="submit"
+                  disabled={!lat || !lng}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed"
+                >
+                  Generate Link
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
