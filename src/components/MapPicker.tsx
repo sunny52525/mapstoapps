@@ -65,7 +65,7 @@ export default function MapPicker({ onLocationSelect, initialLat, initialLng }: 
   const [markerPosition, setMarkerPosition] = useState<[number, number] | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [locationError, setLocationError] = useState<string>('');
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     setIsClient(true);
