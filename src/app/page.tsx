@@ -3,12 +3,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false });
 
 export default function Home() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showManual, setShowManual] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [title, setTitle] = useState('');
@@ -72,6 +76,26 @@ export default function Home() {
     router.push(`/success?url=${encodeURIComponent(shareableUrl)}&title=${encodeURIComponent(title || 'Manual Location')}`);
   };
 
+  const handleMapLocationSelect = (selectedLat: number, selectedLng: number) => {
+    setLat(selectedLat.toFixed(6));
+    setLng(selectedLng.toFixed(6));
+  };
+
+  const handleMapSubmit = () => {
+    setError('');
+    if (!lat || !lng) {
+      setError('Please select a location on the map');
+      return;
+    }
+    try {
+      const shareableUrl = `${window.location.origin}/go?lat=${lat}&lng=${lng}&title=${encodeURIComponent(title || 'Selected Location')}`;
+      router.push(`/success?url=${encodeURIComponent(shareableUrl)}&title=${encodeURIComponent(title || 'Selected Location')}`);
+    } catch (err) {
+      setError('Failed to navigate. Please try again.');
+      console.error('Navigation error:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
       <main className="w-full max-w-2xl">
@@ -88,7 +112,7 @@ export default function Home() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 mb-8">
-          {!showManual ? (
+          {!showManual && !showMap ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -120,15 +144,24 @@ export default function Home() {
                 {loading ? 'Generating Link...' : 'Generate Shareable Link'}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowManual(true)}
-                className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-all text-sm"
-              >
-                Or enter coordinates manually
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowManual(true)}
+                  className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-all text-sm"
+                >
+                  Enter coordinates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMap(true)}
+                  className="w-full bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300 font-medium py-2 px-4 rounded-lg transition-all text-sm"
+                >
+                  📍 Pick on map
+                </button>
+              </div>
             </form>
-          ) : (
+          ) : showManual ? (
             <form onSubmit={handleManualSubmit} className="space-y-4">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Enter coordinates manually as a fallback
@@ -206,6 +239,66 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          ) : (
+            <div className="space-y-4">
+              <MapPicker
+                onLocationSelect={handleMapLocationSelect}
+                initialLat={lat ? parseFloat(lat) : undefined}
+                initialLng={lng ? parseFloat(lng) : undefined}
+              />
+
+              {lat && lng && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+                    ✅ Location Selected:
+                  </div>
+                  <div className="text-xs font-mono text-blue-800 dark:text-blue-400">
+                    Lat: {lat}, Lng: {lng}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="map-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Give it a name? <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional - skip if you want)</span>
+                </label>
+                <input
+                  type="text"
+                  id="map-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., Coffee Shop, Home, Office..."
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMap(false);
+                    setError('');
+                  }}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-lg transition-all"
+                >
+                  Back to URL
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMapSubmit}
+                  disabled={!lat || !lng}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed"
+                >
+                  Generate Link
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
