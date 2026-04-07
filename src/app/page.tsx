@@ -76,9 +76,46 @@ export default function Home() {
     router.push(`/success?url=${encodeURIComponent(shareableUrl)}&title=${encodeURIComponent(title || 'Manual Location')}`);
   };
 
-  const handleMapLocationSelect = (selectedLat: number, selectedLng: number) => {
+  const handleMapLocationSelect = async (selectedLat: number, selectedLng: number) => {
     setLat(selectedLat.toFixed(6));
     setLng(selectedLng.toFixed(6));
+    
+    // Auto-fetch location name using reverse geocoding
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${selectedLat}&lon=${selectedLng}&format=json&addressdetails=1&accept-language=en`,
+        {
+          headers: {
+            'User-Agent': 'MapsToAny-App/1.0',
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const address = data.address || {};
+        const parts = [];
+        
+        // Build a human-readable location name
+        if (address.amenity) parts.push(address.amenity);
+        if (address.shop) parts.push(address.shop);
+        if (address.tourism) parts.push(address.tourism);
+        if (address.road) parts.push(address.road);
+        if (address.neighbourhood) parts.push(address.neighbourhood);
+        if (address.suburb) parts.push(address.suburb);
+        if (address.city) parts.push(address.city);
+        if (address.town) parts.push(address.town);
+        if (address.village) parts.push(address.village);
+        
+        const locationName = parts.slice(0, 3).join(', ');
+        if (locationName) {
+          setTitle(locationName);
+        }
+      }
+    } catch (err) {
+      console.error('Reverse geocoding error:', err);
+      // Don't show error to user, just skip auto-naming
+    }
   };
 
   const handleMapSubmit = () => {
@@ -260,14 +297,14 @@ export default function Home() {
 
               <div>
                 <label htmlFor="map-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Give it a name? <span className="text-gray-500 dark:text-gray-400 font-normal">(Optional - skip if you want)</span>
+                  Location Name <span className="text-gray-500 dark:text-gray-400 font-normal">(Auto-filled, edit if needed)</span>
                 </label>
                 <input
                   type="text"
                   id="map-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Coffee Shop, Home, Office..."
+                  placeholder="Will be auto-filled when you select a location..."
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
                 />
               </div>
